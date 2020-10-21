@@ -1,0 +1,308 @@
+---
+title: "Report II - Analysis of SAR Samples"
+author: "Ma siteng(simon), Liang shuang, Liu zhening(NiuNiu), Zhang yu"
+date: "2020/10/21"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(reshape2)
+require(ggplot2)
+require(ggthemes)
+theme_set(theme_minimal())
+require(GGally)
+require(ggExtra)
+require(tinytex)
+```
+
+## Implement the densities of the K and G0 distributions for intensity data
+
+Import the bright image data from the "ImagematrXI" library for analysis.
+
+```{r LoadUrbanHVData}
+# Use your paths
+source("D:/Program Files/R/RStudio/documents/Codes/imagematrix.R")
+load("D:/Program Files/R/RStudio/documents/Data/R/bright.Rdata")
+# Inspect what they are in the Environment window
+```
+
+The reports are usually started with the very basic information about the data, including its type, dimension and range, etc.
+
+```{r Quantitative_EDA_Urban}
+typeof(bright)
+dim(bright)
+range(bright)
+
+vector.bright <- data.frame(bright=as.vector(bright))
+summary(vector.bright)
+```
+
+When moving to graphical representations of the data, We can analyze the data with boxplot and histogram
+The outliers are shown in orange.
+
+
+```{r Graphical_EDA_Urban_Boxplot, fig.cap='Boxplots with notches', fig.subcap=c('Linear scale', 'Semilogarithmic scale'), out.width = "50%", fig.align = "center"}
+ggplot(vector.bright, aes(x=bright)) +
+  geom_boxplot(notch = TRUE)+
+  geom_boxplot(outlier.colour="orange", outlier.shape=7,outlier.size=1)+
+  ggtitle("bright")
+
+ggplot(vector.bright, aes(x=bright)) +
+  geom_boxplot(notch = TRUE) +
+  geom_boxplot(outlier.colour="orange", outlier.shape=7,outlier.size=1)+
+  scale_x_log10()+
+  ggtitle("bright in semilog scale")
+```
+
+First, we get a boxplot of the bright image data, i.e., the graph on the left named "bright". It can be observed that the 'bright' graph boxes are so flattened. Therefore, we perform a logarithmic transformation of the data to get the boxplot titled "Bright at half logarithmic scale" in the figure below.
+As we can observe in the "bright at half-logarithmic scale" graph, the mean value of the data is around 10^5 and does not fluctuate much.
+
+Histograms of the data complement the information are shown by the boxplots. We also use the Freedman-Diaconis rule for building the histograms, which consists of using bins of equal size: $\frac32 \text{IQR}(z) / n^{1/3}$.
+
+```{r Graphical_EDA_Urban_Histogram, fig.cap='Histograms', fig.subcap=c('Linear scale', 'Semilogarithmic scale'), out.width = "50%", fig.align = "center"}
+ggplot(vector.bright, aes(x=bright)) +
+  geom_histogram(aes(y=..density..),
+                 bins=nclass.FD(unlist(vector.bright)),
+                 col="red", fill="white")+
+  ggtitle("bright")
+
+ggplot(vector.bright, aes(x=bright)) +
+  geom_histogram(aes(y=..density..),
+                 bins=nclass.FD(unlist(vector.bright)),
+                 col="red", fill="white") +
+  scale_x_log10()+
+  ggtitle("bright in semilog scale")
+```
+Now we merge the second boxplot in the second histogram shown as following:
+
+```{r Graphical_EDA_BoxplotAndHistogram}
+ggplot(vector.bright, aes(x=bright)) +
+  geom_histogram(aes(y=..density..),
+                 bins=nclass.FD(unlist(vector.bright)),
+                 col="red", fill="white") +
+  geom_boxplot(aes(y=0.8), width=.1,col="orange", notch=TRUE) +
+  ylab("Density and Boxplot") +
+  xlab("Intensity in semilogarithmic scale") +
+  scale_x_log10()
+# Try reducing the number of bins
+```
+Through the above analysis, we can obtain the following three conclusions:
+
+* The data are positive
+* The data have a very large dynamic range
+* The data are some symmetric
+
+Then, we can pay attention to the "natural" domain of the data: as an image.
+The "imagematrix" library requires the data with the range between $[0,1]$ and we perform a function to do this mapping.
+
+```{r}
+plot(imagematrix(normalize(bright)))
+```
+
+However, there are little things that we can observe in the above image. The reason may be there are a few very large values that "flatten" most of the observations into very deep greyscales. Instead, We want to "use" all possible values equally. In other words, we want to have a uniform histogram.
+
+Considering the cumulative distribution function $F_Z$ of the continuous random variable $Zcolon \Omega\to\mathbb R$, the random variable $W=F_Z(Z)$ has a uniform distribution.
+
+It can be proved that the cumulative distribution function of $W$ is $F_W(w)=/Pr(W/leq w)=/Pr(F_Z(Z)/leq w)$.
+Since $Z$ is continuous, there exists the reciprocal of its cumulative distribution function $F^{-1}_Z$.
+Then we can re-write it as 
+$F_W(w) = Pr(F_Z(Z)/leq w) = Pr(F^{-1}_Z(F_Z(Z)) \leq F_Z^{-1}(w)) = Pr(Z\leq F^{-1}_Z(w))$.
+This is exactly the cumulative distribution function of $Z$ at $F^{-1}_Z(w)$, thus we can prove that $F_W(w) = F_Z(F^{-1}_Z(w))=w$, which characterizes the uniform random variables on $(0,1)$.
+
+Therefore, we need to apply the cumulative distribution function of the random variable generating the data to the data itself, and we'll get a uniformly distributed sample.
+Unfortunately, we don't have such function, but we can estimate it.
+
+One of the simplest ways to estimate the cumulative distribution function from the data $z=(z_1,\dots,z_n)$ is to use the empirical cumulative distribution function, or simply the "empirical function".
+It is only a finite approximation of the definition of the cumulative distribution function, given by the following formula
+\begin{equation}
+\ wide-hat {F}(t) = frac1n # # # j # text{ such that} z_j/leq t/} ,
+\End of the Dusk {formula}
+where $#$ denotes the number of elements in the set.
+
+The original data and its empirical function are shown as following:
+
+```{r OriginalDataEmpiricalFunction}
+ggplot(vector.bright, aes(x=bright)) +
+  geom_histogram(aes(y=..density..),
+                 bins=nclass.FD(unlist(vector.bright))/50,
+                 col="black", fill="white") +
+  stat_ecdf(col="orange") +
+  ylab("Density and Empirical function") +
+  xlab("Intensity in semilogarithmic scale") +
+  scale_x_log10()
+```
+
+Such data can be implemented as:
+
+```{r HistogramEqualization}
+# First, we compute the empirical function
+ecdf.bright <- ecdf(unlist(vector.bright))
+
+# Then, we apply this function to the data
+eq.bright <- ecdf.bright(unlist(vector.bright))
+
+# Finally, we restore the matrix organization of the data
+dim(eq.bright) <- dim(bright)
+
+# And we see the result
+plot(imagematrix(eq.bright))
+```
+
+Now, we can perform an EDA on the equalized data.
+
+```{r EDA_EqualizedData}
+summary(as.vector(eq.bright))
+
+vector.eq.bright <- data.frame(eq.bright=as.vector(eq.bright))
+                              
+ggplot(vector.eq.bright, aes(x=eq.bright)) +
+  geom_histogram(aes(y=..density..),
+                 bins=nclass.FD(unlist(vector.eq.bright)),
+                 col="black", fill="white") +
+  geom_boxplot(aes(y=1.2), width=.1, notch=TRUE) +
+  ylab("Density and Boxplot") +
+  xlab("Equalized data") 
+
+```
+
+In the figure above, it can be shown that after the transformation, the new image has a uniform pixel distribution.
+
+For the sake of simplicity, we can also directly perform a logarithmic transformation of the data, and the result is shown in the figure below.
+
+```{r LogarithmImageTransformation}
+plot(imagematrix(normalize(log(bright))))
+```
+
+When changing the parameters in the histogram, we can see the following results.
+We can perform an example of this effect with a sample of size $n=300$.
+
+#Gamma Distribution
+
+```{r BinSizeEffect, fig.cap='Histograms', fig.subcap=c('Default bin size', 'Freedmand-Diaconis bin size', "Improved histogram"), out.width = "50%", fig.align = "center"}
+x <- data.frame(x=rgamma(300, shape=2, scale=1))
+
+ggplot(x, aes(x=x)) +
+  geom_histogram(aes(y=..density..),
+                 col="blue", fill="white") +
+  ylab("Proportions histogram")
+
+ggplot(x, aes(x=x)) +
+  geom_histogram(aes(y=..density..),
+                 bins=nclass.FD(unlist(x)),
+                 col="blue", fill="white") +
+  ylab("Proportions histogram")
+
+ggplot(x, aes(x=x)) +
+  geom_density(col="orange", size=2) +
+  geom_histogram(aes(y=..density..),
+                 bins=nclass.FD(unlist(x)), 
+                 alpha=0.5, fill="#33AADE", color="black") +
+  ylab("Histogram and smoothed histogram")
+
+```
+
+By comparing the first and second graphs, the results show that the larger the number of boxes, the more data it can be got and the more difficult it is to process.
+
+
+#K Distribution
+
+```{r OriginalDataEmpiricalFunction1}
+
+#Calculation process
+a_K=5
+v_K=2
+L_K=7
+pk_num=1e5
+array_K=1e5
+
+r_k<-seq(1e-5,1e2,length.out = array_K) # array
+x1 <- dgamma(r_k, shape=1, scale=L_K)
+x2 <- dgamma(r_k, shape=a_K/v_K, scale=a_K)
+x=x1*x2
+
+vector.x <- data.frame(r_G0=as.vector(r_k),x=as.vector(x))
+vector.x1 <- data.frame(r_G0=as.vector(r_k),x=as.vector(x1))
+vector.x2 <- data.frame(r_G0=as.vector(r_k),x=as.vector(x2))
+
+ggplot(vector.x, aes(x=r_k, y=x, group=1)) +
+  geom_line(linetype="solid",col="orange")+
+  ylab("PDF-x(x=x1*x2)")+
+  scale_x_log10()
+ggplot(vector.x1, aes(x=r_k, y=x1, group=1)) +
+  geom_line(linetype="solid",col="orange")+
+  ylab("PDF-x1")+
+  scale_x_log10()
+ggplot(vector.x2, aes(x=r_k, y=x2, group=1)) +
+  geom_line(linetype="solid",col="orange")+
+  ylab("PDF-x2")+
+  scale_x_log10()
+
+# K-random
+r_k<-runif(pk_num, min = 0, max = 1) # 0-1 random
+x1 <- qgamma(r_k, shape=1, scale=L_K)
+x2 <- qgamma(r_k, shape=a_K/v_K, scale=a_K)
+x=x1*x2
+x<-data.frame(x) # x~K(a,v,L)
+
+ggplot(x, aes(x=x)) +
+  geom_histogram(aes(y=..density..),alpha=0.5, fill="#6495ED", color="black",bins=nclass.FD(unlist(x))/50) +
+  geom_density(col="orange", size=1) +
+  geom_boxplot(aes(y=1), width=.1, notch=TRUE)+
+  stat_ecdf(col="green") +
+  ylab("Histogram and smoothed histogram")+
+  scale_x_log10()
+
+```
+
+#G0 Distribution
+
+```{r BinSizeEffect1, fig.cap='Histograms', fig.subcap=c('Default bin size', 'Freedmand-Diaconis bin size', "Improved histogram"), out.width = "50%", fig.align = "center"}
+
+a_G0=-2
+r_G0=5
+L_G0=12
+pG0_num=1e5
+array_G0=1e5
+
+#Calculation process
+r_G0<-seq(1e-5,1e2,length.out = array_G0) #  array
+x1 <- dgamma(r_G0, shape=1, scale=L_G0)
+x2 <- dgamma(r_G0, shape=-a_G0, scale=r_G0)
+x=x1/x2
+x<-data.frame(x)
+
+vector.x <- data.frame(r_G0=as.vector(r_G0),x=as.vector(x))
+vector.x1 <- data.frame(r_G0=as.vector(r_G0),x=as.vector(x1))
+vector.x2 <- data.frame(r_G0=as.vector(r_G0),x=as.vector(x2))
+
+ggplot(vector.x, aes(x=r_G0, y=x, group=1)) +
+  geom_line(linetype="solid",col="orange")+
+  ylab("PDF-z=x/y")+
+  scale_x_log10()
+ggplot(vector.x1, aes(x=r_G0, y=x1, group=1)) +
+  geom_line(linetype="solid",col="orange")+
+  ylab("PDF-x`r(1,L)")+
+  scale_x_log10()
+ggplot(vector.x2, aes(x=r_G0, y=x2, group=1)) +
+  geom_line(linetype="solid",col="orange")+
+  ylab("PDF-x`r(-a,r)")+
+  scale_x_log10()
+
+# G0-random
+r_G0<-runif(pG0_num, min = 0, max = 1) # 0-1 random
+x1 <- qgamma(r_G0, shape=1, scale=L_G0)
+x2 <- qgamma(r_G0, shape=-a_G0, scale=r_G0)
+x=x1/x2
+x<-data.frame(x) # x~G0(a,r,L)
+
+ggplot(x, aes(x=x)) +
+  geom_histogram(aes(y=..density..),alpha=0.5, fill="#6495ED",color="black",bins=nclass.FD(unlist(x))/50) +
+  geom_density(col="orange", size=1) +
+  ylab("Histogram and smoothed histogram")+
+  scale_x_log10()
+
+```
