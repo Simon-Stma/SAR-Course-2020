@@ -25,8 +25,8 @@ Import the bright image data from the "ImagematrXI" library for analysis.
 
 ```{r LoadUrbanHVData}
 # Use your paths
-source("D:/Program Files/R/RStudio/documents/Codes/imagematrix.R")
-load("D:/Program Files/R/RStudio/documents/Data/R/bright.Rdata")
+source("../../Code/R/imagematrix.R")
+load("../../Data/R/bright.Rdata")
 # Inspect what they are in the Environment window
 ```
 
