@@ -208,101 +208,174 @@ ggplot(x, aes(x=x)) +
 By comparing the first and second graphs, the results show that the larger the number of boxes, the more data it can be got and the more difficult it is to process.
 
 
-#K Distribution
+#The definition of K-Distribution
 
-```{r OriginalDataEmpiricalFunction1}
+```{r KI_Distributions_definition}
+# This block is the K PDF & K-distributions random generator.
+dKI <- function(z, p_alpha, p_lambda, p_Looks, log=FALSE) {
+  
+  if(log==FALSE) {
+    
+    lLz <- p_lambda * p_Looks* z
+    
+    return((2*p_lambda*p_Looks/(gamma(p_alpha)*gamma(p_Looks))) *
+             (lLz)^((p_alpha+p_Looks)/2-1) *
+             besselK(x = 2*sqrt(lLz), nu = p_alpha-p_Looks)
+    )
+  }
+  
+}
 
-#Calculation process
-a_K=5
-v_K=2
-L_K=7
+
+rKI <- function(n, p_alpha,p_lambda, p_Looks) {
+  
+  return(
+    rgamma(n, 1, p_Looks)*rgamma(n, p_alpha/p_lambda, p_alpha)
+  )
+  
+}
+```
+
+#The definition of G0-Distribution
+
+```{r GI0_Distributions_definition}
+# This block is the G0 PDF & G0-distributions random generator.
+dGI0 <- function(z, p_alpha, p_gamma, p_Looks, log=FALSE) {
+  
+  if(log==TRUE) {
+    return(
+      (p_Looks*log(p_Looks) + lgamma(p_Looks-p_alpha) + (p_Looks-1)*log(z) ) - 
+        (p_alpha*log(p_gamma) + lgamma(-p_alpha) + lgamma(p_Looks) + 
+        (p_Looks-p_alpha)*log(p_gamma + z*p_Looks) ) 
+      )   
+    }
+  else { return( 
+    ( p_Looks^p_Looks * gamma(p_Looks-p_alpha) * z^(p_Looks-1) ) / 
+    (p_gamma^p_alpha * gamma(-p_alpha) * gamma(p_Looks) * (p_gamma + z*p_Looks)^(p_Looks-p_alpha)) 
+  )
+  }
+}
+
+
+rGI0 <- function(n, p_alpha, p_gamma, p_Looks) {
+  
+  return(
+    rgamma(n, 1, p_Looks) / rgamma(n, -p_alpha, p_gamma)
+  )
+  
+}
+```
+
+
+#Different parameters for the Gamma-Distribution
+
+```{r Gamma-Distributions}
+# Gamma Distributions (PDF & CDF)
+ggplot(data=data.frame(x=seq(1e-3, 5, length.out = 1e3)), aes(x=x)) +
+  stat_function(fun=dgamma, geom = "line", size=1, col="red", args = list(shape=1, scale=1)) +
+  stat_function(fun=dgamma, geom = "line", size=1, col="orange", args = list(shape=3, scale=1/3)) +
+  stat_function(fun=dgamma, geom = "line", size=1, col="green", args = list(shape=8, scale=1/8)) +
+  theme_classic() +
+  theme(text = element_text(size=10)) +
+  xlab("x") + ylab("Gamma PDF")
+
+ggplot(data=data.frame(x=seq(1e-3, 5, length.out = 1e3)), aes(x=x)) +
+  stat_function(fun=pgamma, geom = "line", size=1, col="red", args = list(shape=1, scale=1)) +
+  stat_function(fun=pgamma, geom = "line", size=1, col="orange", args = list(shape=3, scale=1/3)) +
+  stat_function(fun=pgamma, geom = "line", size=1, col="green", args = list(shape=8, scale=1/8)) +
+  theme_classic() +
+  theme(text = element_text(size=10)) +
+  xlab("x") + ylab("Gamma CDF")
+
+```
+
+#Different parameters for the K-Distribution
+
+```{r K_Distributions}
+# K Distributions (PDF)
+ggplot(data=data.frame(x=seq(1e-3, 5, length.out = 1e3)), aes(x=x)) +
+  stat_function(fun=dKI, geom = "line", size=1, col="red", args = list(p_alpha=1, p_lambda=1, p_Looks=1)) +
+  stat_function(fun=dKI, geom = "line", size=1, col="orange", args = list(p_alpha=3, p_lambda=3, p_Looks=2)) +
+  stat_function(fun=dKI, geom = "line", size=1, col="green", args = list(p_alpha=8, p_lambda=8, p_Looks=3)) +
+  xlab("x") + 
+  ylab("K PDF")+
+  scale_x_log10()
+```
+
+
+#Different parameters for the G0-Distribution
+
+```{r G0_Distributions}
+# G0 Distributions (PDF)
+ggplot(data=data.frame(x=seq(1e-3, 5, length.out = 1e3)), aes(x=x)) +
+  stat_function(fun=dGI0, geom = "line", size=1, col="red", args = list(p_alpha=-1.5, p_gamma=.5, p_Looks=1)) +
+  stat_function(fun=dGI0, geom = "line", size=1, col="orange", args = list(p_alpha=-3, p_gamma=2, p_Looks=2)) +
+  stat_function(fun=dGI0, geom = "line", size=1, col="green", args = list(p_alpha=-8, p_gamma=7, p_Looks=3)) +
+  xlab("x") + ylab("G0 PDF")+
+  scale_x_log10()
+```
+
+
+
+#Random number generator for K(p_alpha, p_lambda, p_Looks)
+
+```{r KI_random}
+# k-distribution random generator
+p_alpha=3
+p_lambda=2
+p_Looks=1
 pk_num=1e5
-array_K=1e5
-
-r_k<-seq(1e-5,1e2,length.out = array_K) # array
-x1 <- dgamma(r_k, shape=1, scale=L_K)
-x2 <- dgamma(r_k, shape=a_K/v_K, scale=a_K)
-x=x1*x2
-
-vector.x <- data.frame(r_G0=as.vector(r_k),x=as.vector(x))
-vector.x1 <- data.frame(r_G0=as.vector(r_k),x=as.vector(x1))
-vector.x2 <- data.frame(r_G0=as.vector(r_k),x=as.vector(x2))
-
-ggplot(vector.x, aes(x=r_k, y=x, group=1)) +
-  geom_line(linetype="solid",col="orange")+
-  ylab("PDF-x(x=x1*x2)")+
-  scale_x_log10()
-ggplot(vector.x1, aes(x=r_k, y=x1, group=1)) +
-  geom_line(linetype="solid",col="orange")+
-  ylab("PDF-x1")+
-  scale_x_log10()
-ggplot(vector.x2, aes(x=r_k, y=x2, group=1)) +
-  geom_line(linetype="solid",col="orange")+
-  ylab("PDF-x2")+
-  scale_x_log10()
 
 # K-random
-r_k<-runif(pk_num, min = 0, max = 1) # 0-1 random
-x1 <- qgamma(r_k, shape=1, scale=L_K)
-x2 <- qgamma(r_k, shape=a_K/v_K, scale=a_K)
-x=x1*x2
-x<-data.frame(x) # x~K(a,v,L)
+x<-rKI(pk_num, p_alpha, p_lambda, p_Looks) 
+x<-data.frame(x) # x~K(p_alpha, p_lambda, p_Looks)
 
 ggplot(x, aes(x=x)) +
-  geom_histogram(aes(y=..density..),alpha=0.5, fill="#6495ED", color="black",bins=nclass.FD(unlist(x))/50) +
+  geom_histogram(aes(y=..density..),alpha=0.5, fill="#6495ED",        color="black",bins=nclass.FD(unlist(x))/10) +
   geom_density(col="orange", size=1) +
-  geom_boxplot(aes(y=1), width=.1, notch=TRUE)+
-  stat_ecdf(col="green") +
-  ylab("Histogram and smoothed histogram")+
+  geom_boxplot(aes(y=1), width=.1)+
+  stat_ecdf(col="red") +
+  ylab("Histogram & smoothed histogram")+
+  scale_x_log10()
+
+
+ggplot(data=data.frame(x=seq(1e-5, 1e2, length.out = 1e5)), aes(x=x)) +
+  stat_function(fun=dgamma, geom = "line", size=1, col="red", args = list(shape=1, scale=p_Looks)) +
+  stat_function(fun=dgamma, geom = "line", size=1, col="orange", args = list(shape=p_alpha/p_lambda, scale=p_alpha)) +
+  stat_function(fun=dKI, geom = "line", size=1, col="green", args = list(p_alpha=p_alpha, p_lambda=p_lambda, p_Looks=p_Looks)) +
+  xlab("x") + ylab("R-gamma(1,L), B-gamma(a/l,a), G-K(a,l,L)")+
   scale_x_log10()
 
 ```
+#Random number generator for G0(p_alpha, p_gamma, p_Looks)
 
-#G0 Distribution
-
-```{r BinSizeEffect1, fig.cap='Histograms', fig.subcap=c('Default bin size', 'Freedmand-Diaconis bin size', "Improved histogram"), out.width = "50%", fig.align = "center"}
-
-a_G0=-2
-r_G0=5
-L_G0=12
+```{r GI0_random}
+# G0-distribution random generator
+p_alpha=-2
+p_gamma=.5 
+p_Looks=1.5
 pG0_num=1e5
-array_G0=1e5
-
-#Calculation process
-r_G0<-seq(1e-5,1e2,length.out = array_G0) #  array
-x1 <- dgamma(r_G0, shape=1, scale=L_G0)
-x2 <- dgamma(r_G0, shape=-a_G0, scale=r_G0)
-x=x1/x2
-x<-data.frame(x)
-
-vector.x <- data.frame(r_G0=as.vector(r_G0),x=as.vector(x))
-vector.x1 <- data.frame(r_G0=as.vector(r_G0),x=as.vector(x1))
-vector.x2 <- data.frame(r_G0=as.vector(r_G0),x=as.vector(x2))
-
-ggplot(vector.x, aes(x=r_G0, y=x, group=1)) +
-  geom_line(linetype="solid",col="orange")+
-  ylab("PDF-z=x/y")+
-  scale_x_log10()
-ggplot(vector.x1, aes(x=r_G0, y=x1, group=1)) +
-  geom_line(linetype="solid",col="orange")+
-  ylab("PDF-x`r(1,L)")+
-  scale_x_log10()
-ggplot(vector.x2, aes(x=r_G0, y=x2, group=1)) +
-  geom_line(linetype="solid",col="orange")+
-  ylab("PDF-x`r(-a,r)")+
-  scale_x_log10()
 
 # G0-random
-r_G0<-runif(pG0_num, min = 0, max = 1) # 0-1 random
-x1 <- qgamma(r_G0, shape=1, scale=L_G0)
-x2 <- qgamma(r_G0, shape=-a_G0, scale=r_G0)
-x=x1/x2
-x<-data.frame(x) # x~G0(a,r,L)
+x<-rGI0(pG0_num,p_alpha, p_gamma, p_Looks)
+x<-data.frame(x) # x~G0(p_alpha, p_gamma, p_Looks)
 
 ggplot(x, aes(x=x)) +
-  geom_histogram(aes(y=..density..),alpha=0.5, fill="#6495ED",color="black",bins=nclass.FD(unlist(x))/50) +
+  geom_histogram(aes(y=..density..),alpha=0.5, fill="#6495ED",        color="black",bins=nclass.FD(unlist(x))/500) +
   geom_density(col="orange", size=1) +
-  ylab("Histogram and smoothed histogram")+
+  geom_boxplot(aes(y=1), width=.1)+
+  stat_ecdf(col="red") +
+  ylab("Histogram & smoothed histogram")+
+  scale_x_log10()
+
+
+ggplot(data=data.frame(x=seq(1e-5, 1e2, length.out = 1e5)), aes(x=x)) +
+  stat_function(fun=dgamma, geom = "line", size=1, col="red", args = list(shape=1, scale=p_Looks)) +
+  stat_function(fun=dgamma, geom = "line", size=1, col="orange", args = list(shape=-p_alpha, scale=p_gamma)) +
+  stat_function(fun=dGI0, geom = "line", size=1, col="green", args = list(p_alpha=p_alpha, p_gamma=p_gamma, p_Looks=p_Looks)) +
+  xlab("x") + ylab("R-gamma(1,L), B-gamma(-a,g), G-G0(a,g,L)")+
   scale_x_log10()
 
 ```
+
+
